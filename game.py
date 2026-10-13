@@ -1,4 +1,5 @@
 import pygame
+import random
 
 def draw_world(screen):
     screen.fill((100, 150, 190))
@@ -24,7 +25,9 @@ nemo_speed = 2
 score = 0
 
 #Tuna setup
-tunas = [[0, 240, 3],[180,240,2],[470,240,4],[720,440,2]] #[x, y, speed]
+tunas = [[0, 240, 3, 1],[180, 240, 2, 1],[470, 240, 4, 1],[720, 440, 2, -1]] #[x, y, speed, direction]
+last_spawn = pygame.time.get_ticks()
+spawn_delay = random.randint(500, 1500)
 
 while running:
     # 1. Event
@@ -35,21 +38,37 @@ while running:
             running = False
 
     # 2. Update
+    #update nemo
     nemo_y += nemo_speed
-    for tuna in tunas:
-        tuna[0] += tuna[2]
-        if tuna[0] >= 900:
-            tuna[0] = -70
     if nemo_y >= 620:
         score += 1
         nemo_y = 80
+    #update tuna
+    now = pygame.time.get_ticks() #spawn tuna dengan jeda acak
+    if now - last_spawn >= spawn_delay:
+        if random.random() < 0.5:
+            tunas.append([-70, 240, random.randint(2, 4), 1])
+        else:
+            tunas.append([900, 440, random.randint(2, 4), -1])
+        last_spawn = now
+        spawn_delay = random.randint(450,1600)
+    for tuna in tunas: #update posisi tuna
+        tuna[0] += tuna[2] * tuna[3]
+    tunas = [tuna for tuna in tunas if -70 < tuna[0] < 900] #hapus yang ga keliatan
 
     # 3. Draw
     # fill the screen with a color to wipe away anything from last frame
     draw_world(screen)
     pygame.draw.circle(screen,(255, 130, 50),(nemo_x, nemo_y),12)
-    for tuna in tunas:
-        pygame.draw.ellipse(screen,(70, 90, 110),(tuna[0], tuna[1], 70, 30))
+    for x, y, speed, direction in tunas:
+        color = (70, 90, 110)
+        if direction == 1:
+            tail = [(x + 7, y + 15),(x - 9, y + 5),(x - 9, y + 25),]
+        else:
+            tail = [(x + 63, y + 15),(x + 79, y + 5),(x + 79, y + 25),]
+        pygame.draw.polygon(screen, color, tail) #penanda arah
+        pygame.draw.ellipse(screen, color, (x, y, 70, 30))
+    #taruh teks
     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
     fps_text = font.render(f"FPS: {int(clock.get_fps())}", True, (255, 255, 255))
     screen.blit(score_text, (20, 20))
