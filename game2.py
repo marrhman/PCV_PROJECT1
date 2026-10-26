@@ -1,5 +1,7 @@
 import pygame
 import random
+import cv2
+from vision import get_controls
 
 # Setup
 pygame.init()
@@ -10,6 +12,18 @@ clock = pygame.time.Clock()
 WIDTH, HEIGHT = screen.get_size()
 running = True
 dt = 0
+
+# Hand detection setup
+cv2.namedWindow("Threshold Configuration")
+
+cv2.createTrackbar("H Min", "Threshold Configuration", 7, 179, lambda x: None)
+cv2.createTrackbar("H Max", "Threshold Configuration", 22, 179, lambda x: None)
+cv2.createTrackbar("S Min", "Threshold Configuration", 45, 255, lambda x: None)
+cv2.createTrackbar("S Max", "Threshold Configuration", 160, 255, lambda x: None)
+cv2.createTrackbar("V Min", "Threshold Configuration", 80, 255, lambda x: None)
+cv2.createTrackbar("V Max", "Threshold Configuration", 220, 255, lambda x: None)
+
+video_cam = cv2.VideoCapture(0)
 
 # Player
 player = pygame.Rect(WIDTH // 2 - 15, HEIGHT - 120, 30, 30)
@@ -57,6 +71,28 @@ def reset_game():
 while running:
     dt = clock.tick(60) / 1000
 
+    # Read camera
+    success, frame = video_cam.read()
+
+    if not success:
+        running = False
+        continue
+
+    frame = cv2.flip(frame, 1)
+
+    # Read HSV thresholds
+    h_min = cv2.getTrackbarPos("H Min", "Threshold Configuration")
+    h_max = cv2.getTrackbarPos("H Max", "Threshold Configuration")
+    s_min = cv2.getTrackbarPos("S Min", "Threshold Configuration")
+    s_max = cv2.getTrackbarPos("S Max", "Threshold Configuration")
+    v_min = cv2.getTrackbarPos("V Min", "Threshold Configuration")
+    v_max = cv2.getTrackbarPos("V Max", "Threshold Configuration")
+
+    # Detect hand controls
+    active_controls, commands, mask, detected_objects, *_ = get_controls(
+        frame, h_min, s_min, v_min, h_max, s_max, v_max
+    )
+
     # Events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -70,9 +106,16 @@ while running:
 
     if not game_over:
         # Horizontal movement
+        # Key controls
         if keys[pygame.K_a] or keys[pygame.K_LEFT]:
             player.x -= move_speed * dt
         if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+            player.x += move_speed * dt
+
+        # Hand controls
+        if 1 in active_controls or 3 in active_controls:
+            player.x -= move_speed * dt
+        if 2 in active_controls or 4 in active_controls:
             player.x += move_speed * dt
 
         # Wrap around screen
@@ -148,6 +191,14 @@ while running:
             restart.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 20))
         )
 
+    cv2.imshow("Camera", frame)
+    cv2.imshow("Mask", mask)
+
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        running = False
+
     pygame.display.flip()
 
+video_cam.release()
+cv2.destroyAllWindows()
 pygame.quit()
